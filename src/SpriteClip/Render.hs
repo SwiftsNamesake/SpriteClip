@@ -40,7 +40,6 @@ module SpriteClip.Render (module SpriteClip.Render,
 --------------------------------------------------------------------------------------------------------------------------------------------
 import Data.Complex
 import Data.Maybe
-import Data.List (nubBy) -- I love Haskell so much
 
 import Text.Printf
 import Control.Monad (forM_, when)

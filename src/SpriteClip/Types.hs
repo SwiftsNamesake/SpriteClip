@@ -52,7 +52,7 @@ import Southpaw.Cartesian.Plane.BoundingBox
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Sprite sheets ---------------------------------------------------------------------------------------------------------------------------
 -- |
-type CutoutState = ([BoundingBox Double], Complex Double, Maybe (Complex Double))
+-- type CutoutState = ([BoundingBox Double], Complex Double, Maybe (Complex Double))
 
 
 -- |

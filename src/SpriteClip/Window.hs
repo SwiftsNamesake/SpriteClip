@@ -57,12 +57,12 @@ import SpriteClip.Events
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- |
 -- TODO: Take scaling into account (w.r.t image size and coordinate conversions)
-createSpriteCutoutsWindow :: Cairo.Surface -> Complex Double -> Complex Double -> IO (App.App CutoutState)
-createSpriteCutoutsWindow sheet (dx:+dy) (scx:+scy) = App.createWindowWithCanvasAndEvents size' 30 initial eventmap
+createSpriteCutoutsWindow :: Cairo.Surface -> Complex Double -> Complex Double -> IO (App.App AppState)
+createSpriteCutoutsWindow sheet' (dx:+dy) (scx:+scy) = App.createWindowWithCanvasAndEvents size' 30 initial eventmap
   where
-    initial  = ([], 0.0:+0.0, Nothing)
+    initial  = (AppState { _sheet=sheet', _mouse=0.0:+0.0, _active=Nothing, _pin=Nothing, _cutouts=[] })
     size'    = floor (dx*scx):+floor (dy*scy)
-    eventmap = App.EventMap { App.ondraw      = Just $ ondraw (dx:+dy) sheet,
+    eventmap = App.EventMap { App.ondraw      = Just $ ondraw (dx:+dy),
                               App.onanimate   = Just   onanimate,
                               App.onkeypress  = Just   onkeypress,
 
@@ -96,7 +96,7 @@ makeSpritesheetCutouts sheet = do
 
   -- Launch
   App.run $ return app
-  liftM (^. cutouts') $ readIORef (App._state app)
+  liftM (^. cutouts) $ readIORef (App._state app)
 
 
 -- |

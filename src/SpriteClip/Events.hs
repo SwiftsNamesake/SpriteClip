@@ -77,19 +77,20 @@ widgetAddDNDListeners app widget = do
 
 -- Rendering -------------------------------------------------------------------------------------------------------------------------------
 -- |
-ondraw :: Complex Double -> Cairo.Surface -> CutoutState -> Cairo.Render ()
-ondraw canvasSize sheet state@(cutouts, mouse, mclick) = Render.render canvasSize sheet cutouts mclick mouse
+-- TODO: Figure out canvasSize
+ondraw :: Complex Double -> AppState -> Cairo.Render ()
+ondraw canvasSize appstate = Render.render canvasSize (appstate ^. sheet) (appstate^.cutouts) (appstate^.pin) (appstate^.mouse)
 
 
 -- Animation -------------------------------------------------------------------------------------------------------------------------------
 -- |
-onanimate :: Gtk.DrawingArea -> IORef CutoutState -> IO Bool
+onanimate :: Gtk.DrawingArea -> IORef AppState -> IO Bool
 onanimate cvs cutouts = Gtk.widgetQueueDraw cvs >> return True
 
 
 -- Keyboard --------------------------------------------------------------------------------------------------------------------------------
 -- |
-onkeypress :: IORef CutoutState -> EventM EKey Bool
+onkeypress :: IORef AppState -> EventM EKey Bool
 onkeypress cutouts = do
   released <- liftM (Gtk.Release `elem`) Gtk.eventModifier
   if released
@@ -100,21 +101,22 @@ onkeypress cutouts = do
 
 -- Mouse -----------------------------------------------------------------------------------------------------------------------------------
 -- |
-onmousemotion :: IORef CutoutState -> EventM EMotion Bool
+onmousemotion :: IORef AppState -> EventM EMotion Bool
 onmousemotion cutouts = do
   (mx, my) <- eventCoordinates
-  Cairo.liftIO $ modifyIORef cutouts (mouse' .~ (mx:+my))
+  Cairo.liftIO $ modifyIORef cutouts (mouse .~ (mx:+my))
   return False
 
 
 -- |
-onmousedown :: IORef CutoutState -> EventM EButton Bool
-onmousedown cutouts = do
+onmousedown :: IORef AppState -> EventM EButton Bool
+onmousedown stateref = do
   -- TODO: Check which button it is
   -- mouse <- Cairo.liftIO $ readIORef cutouts
   (mx, my) <- eventCoordinates
-  Cairo.liftIO $ modifyIORef cutouts (click' .~ Just (mx:+my))
+  Cairo.liftIO $ modifyIORef stateref (pin .~ Just (mx:+my))
 
+  -- Flesh out cursor behaviour (ie. grab hand when hover over marker)
   Cairo.liftIO $ putStrLn "Setting icon"
   w <- eventWindow
   cursor <- Cairo.liftIO $ Gtk.cursorNew Gtk.Hand1
@@ -124,16 +126,16 @@ onmousedown cutouts = do
 
 
 -- |
-onmouseup :: IORef CutoutState -> EventM EButton Bool
-onmouseup cutouts = do
+onmouseup :: IORef AppState -> EventM EButton Bool
+onmouseup stateref = do
   (mx, my) <- eventCoordinates
   -- TODO: Flip corners if necessary (no negative sizes)
   -- ((makebox topleft (cutouts ^. _2)) :)
-  Cairo.liftIO $ modifyIORef cutouts (\s -> maybe s (\click -> cutouts' %~ (BBox.fromCorners click (mx:+my) :) $ s) (s ^. click'))
+  Cairo.liftIO $ modifyIORef stateref (\s -> maybe s (\click -> s & cutouts %~ (BBox.fromCorners click (mx:+my) :)) (s ^. pin))
 
-  s <- Cairo.liftIO $ readIORef cutouts
+  s <- Cairo.liftIO $ readIORef stateref
 
-  Cairo.liftIO $ modifyIORef cutouts (click' .~ Nothing)
+  Cairo.liftIO $ modifyIORef stateref (pin .~ Nothing)
 
   return True
 
