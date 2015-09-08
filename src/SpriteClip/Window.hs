@@ -91,15 +91,10 @@ makeSpritesheetCutouts sheet = do
   (App._canvas app) `on` buttonReleaseEvent $ onmouseup   (App._state app)
 
   -- Drag and drop
-  dragDestSet (App._canvas app) [DestDefaultMotion, DestDefaultDrop] [ActionCopy]
-  dragDestAddTextTargets (App._canvas app)
-  (App._canvas app) `on` dragDataReceived $ \dc pos i ts -> do
-      Cairo.liftIO $ putStrLn "Processing drop..."
-      s <- selectionDataGetText
-      Cairo.liftIO . putStrLn $ case s of
-          Nothing -> "didn't understand the drop"
-          Just s  -> "understood, here it is: <" ++ s ++ ">"
-  putStrLn "Launching..."
+  widgetAcceptsDNDEvents (App._canvas app)
+  widgetAddDNDListeners  app (App._canvas app)
+
+  -- Launch
   App.run $ return app
   liftM (^. cutouts') $ readIORef (App._state app)
 
@@ -111,8 +106,8 @@ spriteClipMain = do
   putStrLn "Ok, you've chosen a sprite sheet"
   either
     (const $ putStrLn "That's not a sprite sheet.")
-    (\path -> Cairo.imageSurfaceCreateFromPNG path >>= makeSpritesheetCutouts >>= print)
-    (sheets)
+    (\paths -> Cairo.imageSurfaceCreateFromPNG (paths !! 0) >>= makeSpritesheetCutouts >>= print)
+    (imagepaths)
   where
     imagefolder = "C:/Users/Jonatan/Desktop/Java/QMUL/Jon/2015/Feud/assets/"
 

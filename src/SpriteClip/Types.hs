@@ -64,3 +64,8 @@ data AppState = AppState { _cutouts :: [BoundingBox Double],                    
                            _mouse   :: Complex Double,                           -- The current position of the mouse
                            _pin     :: Maybe (Complex Double)                    --
                          }
+
+
+-- |
+-- data InputState = InputState { _mouse :: Complex Double,
+--                                _keys  :: S.Set Key }
