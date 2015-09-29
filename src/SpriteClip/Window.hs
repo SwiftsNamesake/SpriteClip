@@ -35,7 +35,8 @@ module SpriteClip.Window where
 -- We\'ll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import Data.IORef
-import Control.Monad (liftM)
+import qualified Data.Set as S
+import Control.Monad (liftM, forM_)
 import Text.Printf
 
 import qualified Graphics.Rendering.Cairo as Cairo
@@ -60,11 +61,13 @@ import SpriteClip.Events
 createSpriteCutoutsWindow :: Cairo.Surface -> Complex Double -> Complex Double -> IO (App.App AppState)
 createSpriteCutoutsWindow sheet' (dx:+dy) (scx:+scy) = App.createWindowWithCanvasAndEvents size' 30 initial eventmap
   where
-    initial  = (AppState { _sheet=sheet', _mouse=0.0:+0.0, _active=Nothing, _pin=Nothing, _cutouts=[] })
+    initial  = AppState { _sheet=sheet', _mouse=0.0:+0.0, _active=Nothing, _pin=Nothing, _cutouts=[], _keys=S.empty }
     size'    = floor (dx*scx):+floor (dy*scy)
-    eventmap = App.EventMap { App.ondraw      = Just $ ondraw (dx:+dy),
+    eventmap = App.EventMap { App.ondraw      = Just $ ondraw,
                               App.onanimate   = Just   onanimate,
-                              App.onkeypress  = Just   onkeypress,
+
+                              App.onkeydown = Just onkeydown,
+                              App.onkeyup   = Just onkeyup,
 
                               App.onmousedown = Nothing, -- Just onmousedown,
                               App.onmouseup   = Nothing, --Just onmouseup,
@@ -73,9 +76,16 @@ createSpriteCutoutsWindow sheet' (dx:+dy) (scx:+scy) = App.createWindowWithCanva
                               App.ondelete      = Nothing }
 
 
------------------------------------------------------------------------------------------------------------------------
+-- |
+-- createSheetSelectionWindow :: [(String, Cairo.Surface)] -> Window
+-- createSheetSelectionWindow = do
+-- return ()
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
 -- |
 -- TODO: Settings (?)
+-- TODO: Rename (?)
 -- TODO: Proper coordinate system handling
 -- TODO: Extract, turn into stand-alone executable, move components into libraries
 makeSpritesheetCutouts :: Cairo.Surface -> IO [BoundingBox Double]
@@ -86,9 +96,26 @@ makeSpritesheetCutouts sheet = do
   size <- imageSurfaceSize sheet
   app  <- createSpriteCutoutsWindow sheet size (1.0:+1.0)
 
+  -- Icon
+  -- dragSetIconName
+  windowSetIconFromFile (App._window app) "C:/Users/Jonatan/Desktop/Haskell/projects/SpriteClip/assets/images/healthpotion.png"
+
+  -- Cursor
+  -- cursor <- cursorNew Pencil
+  -- children <- containerGetChildren (App._window app)
+  -- forM_ children (liftM (maybe (return ()) (flip drawWindowSetCursor (Just cursor))) . widgetGetWindow)
+  -- forM_ children (liftM (maybe (return ()) (const $ putStrLn "Setting cursor")) . widgetGetWindow)
+  -- forM_ children (const $ putStrLn "Child")
+
   --
   (App._canvas app) `on` buttonPressEvent   $ onmousedown (App._state app)
   (App._canvas app) `on` buttonReleaseEvent $ onmouseup   (App._state app)
+
+  --
+  (App._canvas app) `on` keyPressEvent $ onkeydown (App._state app)
+
+  --
+  (App._window app) `on` realize $ onrealised (app)
 
   -- Drag and drop
   widgetAcceptsDNDEvents (App._canvas app)
@@ -110,56 +137,3 @@ spriteClipMain = do
     (imagepaths)
   where
     imagefolder = "C:/Users/Jonatan/Desktop/Java/QMUL/Jon/2015/Feud/assets/"
-
-
--- | Drag'n'Drop test
-demoDND :: IO ()
-demoDND = do
-    initGUI
-    w <- windowNew
-    l <- labelNew $ Just "drag here lol"
-
-    w `on` destroyEvent $ Cairo.liftIO (mainQuit >> return False)
-    w `on` deleteEvent  $ Cairo.liftIO (mainQuit >> return False)
-
-    containerAdd w l
-
-    widgetAddEvents l [PointerMotionMask]
-
-    dragDestSet l [DestDefaultMotion, DestDefaultDrop] [ActionCopy]
-    dragDestAddTextTargets l
-    dragDestAddImageTargets l
-    dragDestAddURITargets l
-
-    -- l `on` dragBegin $ \ context -> do
-    --   Cairo.liftIO $ putStrLn "Beginning drag..."
-    --   return ()
-
-    l `on` motionNotifyEvent $ Cairo.liftIO (putStrLn "Wheeee!" >> return True)
-
-    l `on` dragMotion  $ \ctx p tm -> do
-      Cairo.liftIO $ putStrLn "Dragging..."
-      atom <- atomNew "String"
-      s <- dragGetData l ctx atom tm
-      return True
-
-    l `on` dragDrop $ \ctx p tm -> do
-      Cairo.liftIO $ putStrLn "Dropping data. Catch!"
-      return True
-
-    l `on` dragDataReceived $ \dc pos id ts -> do
-      Cairo.liftIO $ putStrLn "Receing data..."
-      s <- selectionDataGetURIs
-      Cairo.liftIO $ maybe
-          (putStrLn "didn't understand the drop")
-          (mapM_ (printf "Understood, here it is: <%s>.\n"))
-          (s :: Maybe [String])
-
-      s <- selectionDataGetPixbuf
-      -- maybe
-      --   (_)
-      --   (_)
-      --   (s)
-      return ()
-    widgetShowAll w
-    mainGUI

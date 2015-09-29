@@ -11,7 +11,7 @@
 -- Created September 7 2015
 
 -- TODO | - UI and graphics settings
---        -
+--        - Factor out logic (and settings, input mode, etc.) (should not be embedded in rendering functions)
 
 -- SPEC | -
 --        -
@@ -21,6 +21,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- GHC Pragmas
 --------------------------------------------------------------------------------------------------------------------------------------------
+{-# LANGUAGE OverloadedStrings #-}
 
 
 
@@ -40,9 +41,11 @@ module SpriteClip.Render (module SpriteClip.Render,
 --------------------------------------------------------------------------------------------------------------------------------------------
 import Data.Complex
 import Data.Maybe
+import qualified Data.Set as S
 
 import Text.Printf
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, when, liftM)
+import Control.Lens
 
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.UI.Gtk          as Gtk
@@ -65,16 +68,28 @@ import qualified SpriteClip.Logic  as Logic
 -- Functions
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- | Renders a frame
-render :: Complex Double -> Cairo.Surface -> [BoundingBox Double] -> Maybe (Complex Double) -> Complex Double -> Cairo.Render ()
-render canvasSize sheet sections' mclick mouse = do
-  Render.image (canvasSize*(0.5:+0.0)) sheet -- Render sprite sheet
+render :: AppState -> Cairo.Render ()
+render appstate = do
+  --
+  canvasSize <- imageSurfaceSize sheet'
+
+  -- Render.imageWithClip (const $ const $ Render.circle (appstate ^. mouse) 120) (50:+50) (appstate ^. sheet)
+  Render.image (100:+100) (appstate ^. sheet)
+
+  --
+  -- Render.image (canvasSize*0.5) (appstate ^. sheet) -- Render sprite sheet
   -- Cairo.liftIO $ print (length $ take 5 sections)
-  forM_ sections (section mouse)         -- Render sprite sections with markers
-  forM_ sections (flip alignments mouse) -- Render alignments
-  axes mouse canvasSize                  -- Render cursor axes
-  debugHUD mouse                         -- Render debug overlay
+  forM_ sections' (section mouse') -- Render sprite sections with markers
+  alignments sections' mouse'      -- Render alignments
+  axes mouse' canvasSize           -- Render cursor axes
+  debugHUD appstate                -- Render debug overlay
   where
-    sections = sections' ++ maybe [] (\click -> [BBox.fromCorners click mouse]) mclick
+    sections' = (appstate ^. cutouts) ++ maybe [] (\click -> [BBox.fromCorners click mouse']) (appstate ^. pin)                -- TODO: Refactor
+    mouse'    = Logic.applyOptionals [(gridsnap, dotmap $ Logic.nearestMultiple 20.0), (square, smallest)] (appstate ^. mouse) -- TODO: Rename (eg. cursor or pointer)
+    sheet'    = appstate ^. sheet
+    gridsnap  = S.member "shift_r"    $ appstate ^. keys --
+    square    = S.member "control_r"  $ appstate ^. keys --
+    smallest (re:+im) = min re im :+ min re im           --
 
 
 -- |
@@ -93,51 +108,50 @@ section mouse bbox = do
 -- | Renders the markers for a sheet section (respresented as a 'BoundingBox')
 -- TODO: Options
 -- TODO: Move out hover logic (?)
+-- TODO: Refactor
 sectionMarkers :: BoundingBox Double -> Complex Double -> Cairo.Render ()
-sectionMarkers bbox mouse = do
-  forM_ markerBunches $ \ (radius, colour, offsets) ->
-    forM_ offsets $ \(dx, dy) -> do
+sectionMarkers bbox mouse = forM_ markerBunches $ \ (radius, colour, offsets) ->
+    forM_ offsets $ \pt -> do
       choose colour
-      let scale   = max 0.3 $ min 1.6 (let szx:+szy = _size bbox in min (abs szx) (abs szy)/120.0) -- Scale depending on section size
-          focused = (< scale*radius) . realPart $ abs (mouse - centre (dx:+dy))                    -- Does the cursor lie on the marker?
-          r       = scale*radius*(if focused then 1.4 else 1.0)                                    --
-      Render.circle (centre $ dx:+dy) r
+      Render.circle (centre pt) (r radius pt)
       Cairo.fill
   where
+    scale     = max 0.3 $ min 1.6 (let szx:+szy = _size bbox in min (abs szx) (abs szy)/120.0) -- Scale depending on section size
+    focused r = Logic.within (scale*r) mouse . centre                                          -- Does the cursor lie on the marker?
+    r r' pt   = scale*r'*(if focused r' pt then 1.4 else 1.0)                                  --
     (rectx:+recty)  = _size bbox
     centre (dx:+dy) = _centre bbox + ((dx*rectx/2):+(dy*recty/2))
-    markerBunches   = [(12, Palette.orange & alphapart .~ 0.7, Logic.corners),
-                       (10, Palette.peru   & alphapart .~ 0.7, Logic.midline),
-                       ( 7, Palette.plum   & alphapart .~ 0.7, Logic.centre)]
+    markerBunches   = [(12, Palette.orange & alphapart .~ 0.88, Logic.corners),
+                       (10, Palette.peru   & alphapart .~ 0.88, Logic.midline),
+                       ( 7, Palette.plum   & alphapart .~ 0.88, Logic.centre)]
 
 
 -- | Renders the alignments for a sprite section (respresented as a 'BoundingBox')
 -- TODO: Don't assume the point represents the mouse
-alignments :: BoundingBox Double -> Complex Double -> Cairo.Render ()
-alignments bbox mouse@(mx:+my) = do
+alignments :: [BoundingBox Double] -> Complex Double -> Cairo.Render ()
+alignments bboxes mouse@(mx:+my) = do
 
   -- TODO: Implement actual snapping
   -- TODO: Coalesce duplicate snaps
-  choose (0.4, 0.4, 0.4, 1.0)
-  Cairo.setLineWidth 1
-  Cairo.setDash [8, 8] 0
 
-  forM_ (Logic.snapNearbyPointsToAxis 6.0 [centre $ dx:+dy | (dx, dy) <- Logic.markerPositions] mouse) $ \(mdx, mdy, p@(x:+y)) -> do
-    maybe pass (const $ referenceline (x:+my) p) mdx
-    maybe pass (const $ referenceline (mx:+y) p) mdy
+  forM_ (Logic.uniqueAlignments 0.0 6.0 bboxes mouse) (uncurry referenceline)
 
   -- TODO: Save and push state to prevent interference, rather than resetting manually
   Cairo.newPath        --
   Cairo.setDash [] 0.0 -- Disable dashes
   where
-    (rectx:+recty)  = _size bbox
-    centre (dx:+dy) = _centre bbox + ((dx*rectx/2):+(dy*recty/2))
-    pass            = return ()
-    referenceline (t:+o) (fr:+om) = Cairo.moveTo fr om >> Cairo.lineTo t o >> Cairo.stroke
+    crosshairs (fr:+om) = Cairo.setLineWidth 1.0 >> Cairo.setDash [] 0.0 >> choose Palette.black >> Render.crosshairs (fr:+om) (22:+22) >> Cairo.stroke
+    cairosetup d        = choose (markTheSpot d) >> Cairo.setLineWidth 1 >> Cairo.setDash [8, 8] 0
+    markTheSpot d       = let i = if d /= 0.0 then 0.4 else 0.0 in (i, i, i, 1.0) --
+
+    referenceline (Vertical d)   (fr:+om) = cairosetup d >> Render.line (fr:+om) (fr:+my) >> Cairo.stroke >> crosshairs (fr:+om)
+    referenceline (Horizontal d) (fr:+om) = cairosetup d >> Render.line (fr:+om) (mx:+om) >> Cairo.stroke >> crosshairs (fr:+om)
 
 
 -- | Renders the X and Y axes meeting at the given origin point.
 -- TODO: Options
+-- TODO: Hide mouse, use axes instead
+-- TODO: Use crosshairs with 'hollow middle' at the origin point (?)
 axes :: Complex Double -> Complex Double -> Cairo.Render ()
 axes (ox:+oy) (width:+height) = do
   Cairo.setLineWidth 1
@@ -155,12 +169,17 @@ axes (ox:+oy) (width:+height) = do
 
 
 -- |
-debugHUD :: Complex Double -> Cairo.Render ()
-debugHUD (mx:+my) = do
+debugHUD :: AppState -> Cairo.Render ()
+debugHUD appstate = do
   -- Debug info (HUD)
   Cairo.moveTo 20 20
   choose Palette.darkblue
   Cairo.setFontSize 16
   -- Cairo.fontOptionsSetAntilias Cairo.AntialiasDefault
-  Cairo.selectFontFace "Helvetica" Cairo.FontSlantNormal Cairo.FontWeightNormal
-  Cairo.showText $ (printf "X=%.02f | Y=%.02f" mx my :: String)
+  Cairo.selectFontFace ("Helvetica" :: String) Cairo.FontSlantNormal Cairo.FontWeightNormal
+  Cairo.showText $ (printf "Mouse=(%.02f, %.02f)" mx my :: String)
+  maybe pass (\(px:+py) -> Cairo.showText (printf " | Size=(%.02f, %.02f)" (abs $ px-mx) (abs $ py-my) :: String)) (appstate ^. pin)
+  where
+    (mx:+my) = appstate ^. mouse
+    msize    = liftM (dotmap abs . subtract (mx:+my)) (appstate ^. pin)
+    pass     = return ()

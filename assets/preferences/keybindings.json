@@ -1,0 +1,4 @@
+[
+  { "keys": ["ctrl"],  "action": "toggle-square"},
+  { "keys": ["shift"], "action": "toggle-snap-to-grid"}
+]

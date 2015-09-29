@@ -28,7 +28,14 @@ module Main where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import qualified SpriteClip.Window as Window
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.Map             as M
+import qualified Data.Text            as T
+import qualified Data.Aeson           as JSON
+import Control.Monad (liftM)
+
+import qualified SpriteClip.Window      as Window
+import qualified SpriteClip.Persistence as Persistence
 
 
 
@@ -37,4 +44,8 @@ import qualified SpriteClip.Window as Window
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- |
 main :: IO ()
-main = Window.spriteClipMain
+main = do
+  bindings <- (liftM JSON.eitherDecode $ BS.readFile "assets/preferences/keybindings.json") -- :: IO (Eut (M.Map T.Text T.Text))
+  -- bindings <- BS.readFile "assets/preferences/keybindings.json"
+  print (bindings :: Either String (M.Map T.Text T.Text))
+  Window.spriteClipMain

@@ -52,11 +52,13 @@ library
 
   -- Modules included in this library but not exported.
   other-modules:       SpriteClip.Types,
-                       SpriteClip.Events,
-                       SpriteClip.Window,
-                       SpriteClip.Render,
                        SpriteClip.Lenses,
-                       SpriteClip.Logic
+                       SpriteClip.Logic,
+                       SpriteClip.Events,
+                       SpriteClip.Commands
+                       SpriteClip.Render,
+                       SpriteClip.Window,
+                       SpriteClip.Persistence
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
@@ -64,11 +66,16 @@ library
   -- Other library packages from which modules are imported.
   build-depends:       base       >=4.7 && <4.8,
                        containers >=0.5,
+                       text       >=1.2,
+                       aeson      >=0.6,
+                       bytestring >=0.10,
+                       vector     >=0.10,
+                       filepath   >=1.3,
                        lens       >=4.11,
                        cairo      >=0.13,
                        gtk3       >=0.13,
                        glib,
-                       Southpaw
+                       Southpaw >=0.1.0.4
 
 
   -- Directories containing source files.
@@ -84,7 +91,13 @@ executable SpriteClip
   main-is:             main.hs
 
   -- Other library packages from which modules are imported.
-  build-depends:       base  >=4.7 && <4.8,
+  build-depends:       base       >=4.7 && <4.8,
+                       filepath   >=1.3,
+                       containers >=0.5,
+                       aeson      >=0.6,
+                       bytestring >=0.10,
+                       text       >=1.2,
+                       vector     >=0.10,
                        lens  >=4.11,
                        cairo >=0.13,
                        gtk3  >=0.13,
