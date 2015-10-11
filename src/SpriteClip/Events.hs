@@ -112,6 +112,7 @@ onkeydown stateref = do
 
   Cairo.liftIO $ unless (S.member key $ appstate^.keys) $ do
     -- TODO: Needs heavy refactoring
+    -- TODO: Use foldM (?)
     forM (Commands.dispatch (T.unpack key) (S.map T.unpack . S.insert key $ appstate^.keys) Commands.commands) $ \command -> do
       putStrLn "Running command"
       appstate <- readIORef stateref

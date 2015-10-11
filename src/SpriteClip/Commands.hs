@@ -55,7 +55,9 @@ import SpriteClip.Persistence
 commands :: M.Map Event Command
 commands = M.fromList [ (S.fromList["k"], \appstate -> putStrLn "You pressed 'k'" >> return appstate),
                         (S.fromList["e"], \appstate -> putStrLn "You pressed 'e'" >> return appstate),
-                        (S.fromList["control_l", "s"], \appstate -> BS.writeFile "assets/saves/spritesections.json" (JSON.encode $ appstate ^. cutouts) >> return appstate) ]
+                        (S.fromList["control_l", "s"], \appstate -> BS.writeFile path (JSON.encode $ appstate ^. cutouts) >> return appstate) ]
+  where
+    path = "C:/Users/Jonatan/Desktop/Haskell/projects/SpriteClip/assets/saves/spritesections.json"
 
 
 

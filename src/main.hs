@@ -45,7 +45,9 @@ import qualified SpriteClip.Persistence as Persistence
 -- |
 main :: IO ()
 main = do
-  bindings <- (liftM JSON.eitherDecode $ BS.readFile "assets/preferences/keybindings.json") -- :: IO (Eut (M.Map T.Text T.Text))
+  bindings <- (liftM JSON.eitherDecode $ BS.readFile fn) -- :: IO (Eut (M.Map T.Text T.Text))
   -- bindings <- BS.readFile "assets/preferences/keybindings.json"
   print (bindings :: Either String (M.Map T.Text T.Text))
   Window.spriteClipMain
+  where
+    fn = "C:/Users/Jonatan/Desktop/Haskell/projects/assets/preferences/keybindings.json"

@@ -12,6 +12,9 @@
 
 -- TODO | - Refactor, utilities
 --        - Figure out applicative, functor
+--        - Derive instances automatically (?)
+--        - Move to library
+
 
 -- SPEC | -
 --        -
@@ -71,9 +74,16 @@ instance FromJSON (M.Map (S.Set T.Text) T.Text) where
   parseJSON _         = mzero
 
 
+instance FromJSON r => FromJSON (Complex r) where
+  parseJSON (Object obj) = (:+) <$> (obj .: "x") <*> (obj .: "y")
+
+
+instance FromJSON r => FromJSON (BoundingBox r) where
+  parseJSON (Object obj) = BoundingBox <$> (obj .: "centre") <*> (obj .: "size")
+
 -- Serialise -------------------------------------------------------------------------------------------------------------------------------
 -- |
-instance ToJSON val => ToJSON (Complex val) where
+instance ToJSON r => ToJSON (Complex r) where
   toJSON (x:+y) = object ["x" .= toJSON x, "y" .= toJSON y]
 
 
